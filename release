@@ -1,0 +1,12 @@
+#!/bin/sh
+
+set -e
+
+rm -fr dist
+yarn build
+jq 'del(.scripts) | del(.devDependencies) + { main: "index.js" }' < package.json >dist/package.json
+cd dist
+yarn publish --access public
+
+exit 0
+
