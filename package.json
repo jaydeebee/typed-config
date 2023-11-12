@@ -1,0 +1,24 @@
+{
+  "name": "typed-config",
+  "version": "1.0.0",
+  "description": "Type-safe configuration using Zod",
+  "main": "dist/index.js",
+  "repository": "https://github.com/jaydeebee/typed-config",
+  "license": "MIT",
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "lodash": "^4.17.21",
+    "typescript": "^5.2.2",
+    "yargs-parser": "^21.1.1",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/lodash": "^4.14.201",
+    "@types/node": "^20.9.0",
+    "@types/yargs-parser": "^21.0.3",
+    "prettier": "^3.0.3"
+  }
+}
