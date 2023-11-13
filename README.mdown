@@ -1,0 +1,112 @@
+# @jaydeebee/typed-config
+
+[typed-config](https://github.com/jaydeebee/typed-config) is a type-safe libary for reading and accessing configuration data from a JSON file.  The configuration schema is given using Zod.  It supports nested objects using a JSON-path syntax.
+
+## Usage
+
+Defining a schema and getting a "config getter" function:
+
+```typescript
+import { getConfigGetter } from 'typed-config'
+import { z } from 'zod'
+
+const getConfig = getConfigGetter(z.object({
+  someValue: z.string().default('default value'),
+  someOtherValue: z.number().default(42),
+  someObject: z.object({
+    someNestedValue: z.boolean().default(false),
+  }),
+}))
+```
+
+Here, we've called `getConfigGetter()`, passing it a configuration schema using Zod.  It returned a function, which we assigned to `getConfig`, which we'll use to retrieve configuration:
+
+```typescript
+  const someValue = getConfig('someValue')   // type string
+  const someOtherValue = getConfig('someOtherValue')   // type number
+  const someNestedValue = getConfig('someObject.someNestedValue')   // type boolean
+```
+
+## Supported Options
+
+`getConfigGetter()` takes an optional second argument to control the behavior of the config getter.  It supports the following members:
+
+* `defaultsFn (function)`: A function that'll return defaults matching the schema given.  See Specifying Defaults below.
+* `jsonFile (boolean | string | null)` (optional): If a string, gives the path to the JSON file.  If false, disables reading from a JSON file at all.  If true, assumes `config.json`.  See JSON File Resolution below.
+* `commandLine (boolean)` (optional): Whether to check command line usage
+  for the
+* `prefix (string)` (optional): If present, specifies a JSON path within the configuration data to merge to the root.  See Prefix Handling below.
+
+## Specifying Defaults
+
+It's possible to use the `default()` method on Zod schemas to specify a default value.  However, this is not always convenient, or may produce unexpected results in specific cases.
+
+The `defaultsFn` option allows you to specify a function to return last-resort/default configuration values.  It's called without arguments, and should return an partial object matching the schema given to `getConfigGetter()`.
+
+The choice to make this a function instead of an object is that you may prefer to load your defaults from another source, such as environment variables.  Defaults are then evaluated during the `getConfigGetter()` call, deferring defaults evaluation until needed.  This provides opportunity to call `dotenv.config()` first, for example.
+
+Example:
+```typescript
+const getConfig = getConfigGetter(z.object({
+  someValue: z.string(),
+  someOtherValue: z.coerce.number(),
+  someObject: z.object({
+    someNestedValue: z.boolean(),
+  }),
+}), () => ({
+  someValue: process.env.SOME_VALUE || 'default value',
+  someOtherValue: process.env.SOME_OTHER_VALUE || 42,
+  someObject: {
+    someNestedValue: false,
+  },
+}))
+```
+
+## Prefix Handling
+
+Suppose you have two applications, `app1` and `app2`, which share a configuration file.  The configuration between them is largely the same, but you want to have specific values differ between them.  You can do this by using `prefix`.
+
+Given a configuration file:
+```json
+  {
+    "apps": {
+      "app1": {
+        "someValue": "app1 value",
+        "someObject": {
+          "someNestedValue": true
+        }
+      },
+      "app2": {
+        "someValue": "app2 value",
+        "someOtherValue": 2,
+      }
+    },
+
+    // The common configuration:
+    "someValue": "shared value",
+    "someOtherValue": 42,
+    "someObject": {
+      "someNestedValue": true
+    }
+  }
+```
+
+When app1 processes it, it passes options that include `{ prefix: 'apps.app1' }`.  Internally, `getConfigGetter()` will hoist the `apps.app1` object to the root, then parse the configuration as normal.  Any unrecognized keys (including any `apps` entries for other applications) will be discarded.
+
+## Command line usage
+
+If the `commandLine` option is enabled (the default), then `getConfigGetter()` will check for command line arguments matching the configuration schema.  It will understand both hyphenated options and `camelCase` naming convention for command line arguments (using yargs-parser to do the parsing).  Nested keys are given with `.` in the name.  Example:
+```
+    node myapp.js --some-value=foo --someObject.someNestedValue=true
+```
+
+## JSON File Resolution
+
+Assuming all avenues are enabled, `getConfigGetter()` will look for JSON files in the following places, in this order:
+
+1. The path given on the command line using `--config-json-file`
+2. Environment variable `CONFIG_JSON_FILE`
+3. The path given in the `jsonFile` option
+4. `config.json` in the application's current working directory
+
+The goal of this ordering is to respect the user's runtime wishes, then the developer's configuration, then the library's defaults.
