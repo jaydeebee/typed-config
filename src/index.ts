@@ -28,9 +28,9 @@
  *  const someNestedValue = getConfig('someObject.someNestedValue')   // type boolean
  */
 import { mergeWith } from 'lodash';
-import { z } from 'zod'
-import fs from 'fs'
-import yargsParser from 'yargs-parser'
+import { z } from 'zod';
+import fs from 'fs';
+import yargsParser from 'yargs-parser';
 
 /**
  * Interface for configuration options.
@@ -41,10 +41,10 @@ import yargsParser from 'yargs-parser'
  * @property {() => Partial<T>} defaultsFn - A function to return default values
  */
 export interface ConfigOptions<T> {
-  prefix?: string | null
-  jsonFile?: boolean | string
-  commandLine?: boolean
-  defaultsFn?: () => Partial<T>
+  prefix?: string | null;
+  jsonFile?: boolean | string;
+  commandLine?: boolean;
+  defaultsFn?: () => Partial<T>;
 }
 
 /**
@@ -54,11 +54,11 @@ export interface ConfigOptions<T> {
  *
  * This is not commonly used by consumers of this library.
  */
-export type ConfigKey<T> =
-  T extends object ? {
-    [K in keyof T]: K extends string ?
-      `${K}` | `${K}.${ConfigKey<T[K]>}` : never;
-  }[keyof T] : never;
+export type ConfigKey<T> = T extends object
+  ? {
+      [K in keyof T]: K extends string ? `${K}` | `${K}.${ConfigKey<T[K]>}` : never;
+    }[keyof T]
+  : never;
 
 /**
  * Type for a given ConfigValue.
@@ -67,14 +67,15 @@ export type ConfigKey<T> =
  *
  * This is not commonly used by consumers of this library.
  */
-export type ConfigValue<T, K extends ConfigKey<T>> =
-  K extends `${infer P}.${infer R}`
-    ? P extends keyof T
-      ? R extends ConfigKey<T[P]>
-        ? ConfigValue<T[P], R>
-        : never
+export type ConfigValue<T, K extends ConfigKey<T>> = K extends `${infer P}.${infer R}`
+  ? P extends keyof T
+    ? R extends ConfigKey<T[P]>
+      ? ConfigValue<T[P], R>
       : never
-    : K extends keyof T ? T[K] : never;
+    : never
+  : K extends keyof T
+  ? T[K]
+  : never;
 
 /**
  * A helper for ldoash's mergeDeep() to handle conflict resolution
@@ -91,7 +92,7 @@ const deepConfigMerge = <T>(objValue: T | undefined, srcValue: T | undefined, ke
     return objValue as T;
   } else if (Array.isArray(objValue)) {
     // We merge arrays
-    return objValue.concat(...Array.isArray(srcValue) ? srcValue : [srcValue]) as T;
+    return objValue.concat(...(Array.isArray(srcValue) ? srcValue : [srcValue])) as T;
   } else if (typeof objValue === 'object' && objValue !== null) {
     if (typeof srcValue !== 'object') {
       throw new Error(`Cannot merge ${key} into an object from type ${typeof srcValue}`);
@@ -100,7 +101,7 @@ const deepConfigMerge = <T>(objValue: T | undefined, srcValue: T | undefined, ke
   } else {
     return srcValue as T;
   }
-}
+};
 
 /**
  * Function to get configuration getter.
@@ -114,59 +115,62 @@ export function getConfigGetter<T extends z.ZodType<any, any>>(schema: T, option
     prefix: null,
     jsonFile: true,
     commandLine: true,
-    ...options ?? {},
-  }
+    ...(options ?? {}),
+  };
 
-  type SchemaType = z.infer<T>
+  type SchemaType = z.infer<T>;
 
   const parsedCommandLine = options.commandLine
     ? yargsParser(process.argv.slice(2), {
-      configuration: {
-        'dot-notation': true,
-      },
-    })
-    : {} as yargsParser.Arguments
+        configuration: {
+          'dot-notation': true,
+        },
+      })
+    : ({} as yargsParser.Arguments);
 
   if (parsedCommandLine._?.length > 0) {
-    console.warn(`Unrecognized command line options: ${parsedCommandLine._.join(' ')}`)
+    console.warn(`Unrecognized command line options: ${parsedCommandLine._.join(' ')}`);
   }
 
   if (parsedCommandLine.help) {
-    const command = options.prefix ?? process.argv[1] ?? 'node <script>'
-    console.log(`Usage: ${command} [--config-json-file <file>] [--<key> <value>]`)
-    console.log('Options:')
-    console.log('  --config-json-file <file>  Path to config JSON file')
-    console.log('  --print-config             Display parsed config and exit')
-    console.log('  --<key> <value>            Override config value')
-    process.exit(0)
+    const command = options.prefix ?? process.argv[1] ?? 'node <script>';
+    console.log(`Usage: ${command} [--config-json-file <file>] [--<key> <value>]`);
+    console.log('Options:');
+    console.log('  --config-json-file <file>  Path to config JSON file');
+    console.log('  --print-config             Display parsed config and exit');
+    console.log('  --<key> <value>            Override config value');
+    process.exit(0);
   }
 
-  const configJsonFile = parsedCommandLine.configJsonFile
-    || process.env.CONFIG_JSON_FILE
-    || (typeof options.jsonFile === 'string' ? options.jsonFile : null)
-    || './config.json'
+  const configJsonFile =
+    parsedCommandLine.configJsonFile ||
+    process.env.CONFIG_JSON_FILE ||
+    (typeof options.jsonFile === 'string' ? options.jsonFile : null) ||
+    './config.json';
 
-  const rawData = ((!!options.jsonFile) && fs.existsSync(configJsonFile))
-    ? JSON.parse(fs.readFileSync(configJsonFile, 'utf8'))
-    : {}
+  const rawData =
+    !!options.jsonFile && fs.existsSync(configJsonFile) ? JSON.parse(fs.readFileSync(configJsonFile, 'utf8')) : {};
 
   // Given rawData, prefix, and defaults, merge things together into merged data.
-  const defaults = options.defaultsFn?.() ?? {}
-  const prefixedRaw = options.prefix && `${options.prefix}`.split('.').reduce((acc, k) => acc?.[k], rawData)
-  const merged = mergeWith({}, defaults ?? {}, rawData, prefixedRaw ?? {}, parsedCommandLine, deepConfigMerge)
-  const data: z.infer<T> = schema.parse(merged)
+  const defaults = options.defaultsFn?.() ?? {};
+  const prefixedRaw = options.prefix && `${options.prefix}`.split('.').reduce((acc, k) => acc?.[k], rawData);
+  const merged = mergeWith({}, defaults ?? {}, rawData, prefixedRaw ?? {}, parsedCommandLine, deepConfigMerge);
+  const data: z.infer<T> = schema.parse(merged);
 
   if (parsedCommandLine.printConfig) {
-    console.log(JSON.stringify(data, null, 2))
-    process.exit(0)
+    console.log(JSON.stringify(data, null, 2));
+    process.exit(0);
   }
 
   return <K extends ConfigKey<SchemaType>, V extends ConfigValue<SchemaType, K>>(key: K, defaultValue?: V): V => {
-    const value = key.toString().split('.').reduce((acc, k) => acc?.[k], data) as V | undefined
+    const value = key
+      .toString()
+      .split('.')
+      .reduce((acc, k) => acc?.[k], data) as V | undefined;
     if (value === undefined) {
-      if (defaultValue === undefined) throw new Error(`The config variable '${key.toString()}' is not defined.`)
-      else return defaultValue
+      if (defaultValue === undefined) throw new Error(`The config variable '${key.toString()}' is not defined.`);
+      else return defaultValue;
     }
-    return value as V
-  }
+    return value as V;
+  };
 }
