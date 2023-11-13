@@ -142,8 +142,8 @@ export function getConfigGetter<T extends z.ZodType<any, any>>(schema: T, option
   }
 
   const configJsonFile = parsedCommandLine.configJsonFile
-    || (typeof options.jsonFile === 'string' ? options.jsonFile : null)
     || process.env.CONFIG_JSON_FILE
+    || (typeof options.jsonFile === 'string' ? options.jsonFile : null)
     || './config.json'
 
   const rawData = ((!!options.jsonFile) && fs.existsSync(configJsonFile))
